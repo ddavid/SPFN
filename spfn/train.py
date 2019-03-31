@@ -17,6 +17,57 @@ import os
 import json
 import argparse
 
+def live_demo(pcl):
+    '''
+    @input np.array dtype=float [:, :3]
+    Gets input pcl from TCP Client and performs prediction step
+    '''
+    tf.set_random_seed(1234)
+    np.random.seed(1234)
+    random.seed(1234)
+    register_custom_svd_gradient()
+
+    conf = NetworkConfig('./default_configs/network_config.yml')
+
+    visible_GPUs = conf.get_CUDA_visible_GPUs()
+    if visible_GPUs is not None:
+        print('Setting CUDA_VISIBLE_DEVICES={}'.format(','.join(visible_GPUs)))
+        os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(visible_GPUs)
+
+    fitter_factory.register_primitives(conf.get_list_of_primitives())
+
+    local_batch_size = conf.get_batch_size()
+    n_max_instances = conf.get_n_max_instances()
+
+    tf_conf = tf.ConfigProto()
+    tf_conf.allow_soft_placement = True
+    tf_conf.gpu_options.allow_growth = True
+
+    in_model_dir = conf.get_in_model_dir()
+    ckpt = tf.train.get_checkpoint_state(in_model_dir)
+    should_restore = (ckpt is not None) and (ckpt.model_checkpoint_path is not None)
+
+    print('Building network...')
+    net = Network(n_max_instances=n_max_instances, config=conf, is_new_training=not should_restore)
+    with tf.Session(config=tf_conf, graph=net.graph) as sess:
+        if conf.is_debug_mode():
+            sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+
+        if should_restore:
+            print('Restoring ' + ckpt.model_checkpoint_path + ' ...')
+            tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
+
+        print('Loading data...')
+        # Do prediction for current pcl
+        return net.simple_predict_and_return(
+            sess,
+            pcl=pcl
+            # pcl already in right format as numpy.ndarray
+            #pcl=np.genfromtxt(args.test_pc_in, delimiter=' ', dtype=float)[:, :3],
+        )
+    
+
+
 if __name__ == '__main__':
     tf.set_random_seed(1234)
     np.random.seed(1234)
@@ -26,6 +77,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('config_file', help='YAML configuration file')
     parser.add_argument('--test', action='store_true', help='Run network in test time')
+    parser.add_argument('--live', action='store_true', help='Run network on live pcl data')
     parser.add_argument('--test_pc_in', type=str)
     parser.add_argument('--test_h5_out', type=str)
     args = parser.parse_args()
@@ -78,7 +130,7 @@ if __name__ == '__main__':
             else:
                 # batch testing
                 test_data = Dataset(
-                    batch_size=batch_size, 
+                    batch_size=batch_size,
                     n_max_instances=n_max_instances, 
                     csv_path=conf.get_test_data_file(), 
                     noisy=conf.is_test_data_noisy(), 
@@ -92,7 +144,7 @@ if __name__ == '__main__':
                 )
         else:
             train_data = Dataset(
-                batch_size=batch_size, 
+                batch_size=batch_size,
                 n_max_instances=n_max_instances, 
                 csv_path=conf.get_train_data_file(), 
                 noisy=conf.is_train_data_noisy(), 
@@ -100,7 +152,7 @@ if __name__ == '__main__':
                 first_n=conf.get_train_data_first_n()
             )
             val_data = Dataset(
-                batch_size=batch_size, 
+                batch_size=batch_size,
                 n_max_instances=n_max_instances, 
                 csv_path=conf.get_val_data_file(), 
                 noisy=conf.is_val_data_noisy(), 

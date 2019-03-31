@@ -13,6 +13,9 @@ import numpy as np
 import tensorflow as tf
 import re
 import subprocess
+import pickle
+
+import json
 
 class Network(object):
     def __init__(self, n_max_instances, config, is_new_training):
@@ -266,6 +269,44 @@ class Network(object):
             'msg': msg,
             'summary': summary,
         }
+
+    def single_nn_json(nn_name, pred_result, W_reduced=True):
+        batch_size = pred_result['W'].shape[0]
+        assert batch_size == 1
+        pred_dict = {}
+        type_per_point = np.argmax(pred_result['type_per_point'], axis=2)  # BxN
+        instance_per_point = pred_result['W']  # BxNxK
+        if W_reduced:
+            instance_per_point = np.argmax(instance_per_point, axis=2)  # BxN
+        #f = h5py.File(pred_h5_file, 'w')
+        pred_dict['method_name']        = nn_name
+        pred_dict['name_to_id_dict']    = np.void(pickle.dumps(fitter_factory.primitive_name_to_id_dict))
+        pred_dict['normal_per_point']   = pred_result['normal_per_point'][0]
+        pred_dict['type_per_point']     = type_per_point[0]
+        pred_dict['instance_per_point'] = instance_per_point[0]
+
+        #f.create_dataset('normal_per_point', data=pred_result['normal_per_point'][0])
+        #f.create_dataset('type_per_point', data=type_per_point[0])
+        #f.create_dataset('instance_per_point', data=instance_per_point[0])
+        #g = f.create_group('parameters')
+        #for key in pred_result['parameters']:
+        #    g.create_dataset(key, data=pred_result['parameters'][key][0])
+        pred_json = json.dumps(pred_dict)
+        serialized_pred_json = pickle.dumps(pred_json)
+
+        return serialized_pred_json
+
+    def simple_predict_and_return(self, sess, pcl):
+        feed_dict = {
+            self.P: np.expand_dims(pcl, axis=0), # 1xNx3
+            self.is_training: False
+        }
+        pred_result = sess.run(self.pred_dict, feed_dict=feed_dict)
+        return self.single_nn_json(
+            nn_name=self.config.get_nn_name(),
+            pred_result=pred_result,
+            W_reduced=False
+        )
 
     def simple_predict_and_save(self, sess, pc, pred_h5_file):
         feed_dict = {
