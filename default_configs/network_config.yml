@@ -48,7 +48,7 @@ snapshot_interval: 500
 in_model_dir: "results/model"
 out_model_dir: "results/model"
 val_prediction_dir: "results/val_pred"
-val_prediction_n_keep: 2
+val_prediction_n_keep: -1
 test_prediction_dir: "results/test_pred"
 log_dir: "results/log"
 writer_start_step: 1000
