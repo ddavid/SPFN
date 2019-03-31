@@ -270,6 +270,8 @@ class Network(object):
             'summary': summary,
         }
 
+    # Return prediction as JSON object in bytes
+    # json.dumps would be JSON string
     def single_nn_json(nn_name, pred_result, W_reduced=True):
         batch_size = pred_result['W'].shape[0]
         assert batch_size == 1

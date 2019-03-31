@@ -14,53 +14,56 @@ import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 import numpy as np
 import os
-import json
 import argparse
 
-def live_demo(pcl):
-    '''
-    @input np.array dtype=float [:, :3]
-    Gets input pcl from TCP Client and performs prediction step
-    '''
-    tf.set_random_seed(1234)
-    np.random.seed(1234)
-    random.seed(1234)
-    register_custom_svd_gradient()
 
-    conf = NetworkConfig('./default_configs/network_config.yml')
+class SPFN(object):
+    def __init__(self):
+        '''
+            \brief Initialize SPFN network object for use later on in the server
+        '''
+        tf.set_random_seed(1234)
+        np.random.seed(1234)
+        random.seed(1234)
+        register_custom_svd_gradient()
 
-    visible_GPUs = conf.get_CUDA_visible_GPUs()
-    if visible_GPUs is not None:
-        print('Setting CUDA_VISIBLE_DEVICES={}'.format(','.join(visible_GPUs)))
-        os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(visible_GPUs)
+        conf = NetworkConfig('./default_configs/network_config.yml')
 
-    fitter_factory.register_primitives(conf.get_list_of_primitives())
+        visible_GPUs = conf.get_CUDA_visible_GPUs()
+        if visible_GPUs is not None:
+            print('Setting CUDA_VISIBLE_DEVICES={}'.format(','.join(visible_GPUs)))
+            os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(visible_GPUs)
 
-    local_batch_size = conf.get_batch_size()
-    n_max_instances = conf.get_n_max_instances()
+        fitter_factory.register_primitives(conf.get_list_of_primitives())
 
-    tf_conf = tf.ConfigProto()
-    tf_conf.allow_soft_placement = True
-    tf_conf.gpu_options.allow_growth = True
+        # Not used since batch is always one --> Use batches and combine outputs for visualisation?
+        #local_batch_size = conf.get_batch_size()
+        n_max_instances = conf.get_n_max_instances()
 
-    in_model_dir = conf.get_in_model_dir()
-    ckpt = tf.train.get_checkpoint_state(in_model_dir)
-    should_restore = (ckpt is not None) and (ckpt.model_checkpoint_path is not None)
+        tf_conf = tf.ConfigProto()
+        tf_conf.allow_soft_placement = True
+        tf_conf.gpu_options.allow_growth = True
 
-    print('Building network...')
-    net = Network(n_max_instances=n_max_instances, config=conf, is_new_training=not should_restore)
-    with tf.Session(config=tf_conf, graph=net.graph) as sess:
-        if conf.is_debug_mode():
-            sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+        in_model_dir = conf.get_in_model_dir()
+        ckpt = tf.train.get_checkpoint_state(in_model_dir)
+        should_restore = (ckpt is not None) and (ckpt.model_checkpoint_path is not None)
 
-        if should_restore:
-            print('Restoring ' + ckpt.model_checkpoint_path + ' ...')
-            tf.train.Saver().restore(sess, ckpt.model_checkpoint_path)
+        print('Building network...')
+        net = Network(n_max_instances=n_max_instances, config=conf, is_new_training=not should_restore)
+        with tf.Session(config=tf_conf, graph=net.graph) as self.sess:
+            if conf.is_debug_mode():
+                self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
 
-        print('Loading data...')
+            if should_restore:
+                print('Restoring ' + ckpt.model_checkpoint_path + ' ...')
+                tf.train.Saver().restore(self.sess, ckpt.model_checkpoint_path)
+
+            print('Loading data...')
+
+    def predict_single_pcl(self, pcl):
         # Do prediction for current pcl
         return net.simple_predict_and_return(
-            sess,
+            self.sess,
             pcl=pcl
             # pcl already in right format as numpy.ndarray
             #pcl=np.genfromtxt(args.test_pc_in, delimiter=' ', dtype=float)[:, :3],
@@ -77,7 +80,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('config_file', help='YAML configuration file')
     parser.add_argument('--test', action='store_true', help='Run network in test time')
-    parser.add_argument('--live', action='store_true', help='Run network on live pcl data')
     parser.add_argument('--test_pc_in', type=str)
     parser.add_argument('--test_h5_out', type=str)
     args = parser.parse_args()
@@ -148,7 +150,8 @@ if __name__ == '__main__':
                 n_max_instances=n_max_instances, 
                 csv_path=conf.get_train_data_file(), 
                 noisy=conf.is_train_data_noisy(), 
-                fixed_order=False, 
+                # fixed order because of OOM error
+                fixed_order=True,
                 first_n=conf.get_train_data_first_n()
             )
             val_data = Dataset(
@@ -169,4 +172,3 @@ if __name__ == '__main__':
                 model_dir=conf.get_out_model_dir(),
                 log_dir=conf.get_log_dir(),
             )
-
