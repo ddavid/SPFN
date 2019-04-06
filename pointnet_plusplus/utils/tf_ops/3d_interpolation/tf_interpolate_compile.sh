@@ -9,5 +9,5 @@ g++ -std=c++11 tf_interpolate.cpp -o tf_interpolate_so.so -shared -fPIC \
   -I $tensorflow_external_dir \
   -L $cuda_library_dir \
   -L $tensorflow_library_dir \
-  -ltensorflow_framework -O2 -D_GLIBCXX_USE_CXX11_ABI=0
+  -ltensorflow_framework -O2
 
