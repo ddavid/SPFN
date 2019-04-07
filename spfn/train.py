@@ -27,47 +27,51 @@ class SPFN(object):
         random.seed(1234)
         register_custom_svd_gradient()
 
-        conf = NetworkConfig('./default_configs/network_config.yml')
+        self.conf = NetworkConfig('./SPFN/default_configs/network_config.yml')
 
-        visible_GPUs = conf.get_CUDA_visible_GPUs()
+        visible_GPUs = self.conf.get_CUDA_visible_GPUs()
         if visible_GPUs is not None:
             print('Setting CUDA_VISIBLE_DEVICES={}'.format(','.join(visible_GPUs)))
             os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(visible_GPUs)
 
-        fitter_factory.register_primitives(conf.get_list_of_primitives())
+        fitter_factory.register_primitives(self.conf.get_list_of_primitives())
 
         # Not used since batch is always one --> Use batches and combine outputs for visualisation?
         #local_batch_size = conf.get_batch_size()
-        n_max_instances = conf.get_n_max_instances()
+        n_max_instances = self.conf.get_n_max_instances()
 
-        tf_conf = tf.ConfigProto()
-        tf_conf.allow_soft_placement = True
-        tf_conf.gpu_options.allow_growth = True
+        self.tf_conf = tf.ConfigProto()
+        self.tf_conf.allow_soft_placement = True
+        self.tf_conf.gpu_options.allow_growth = True
 
-        in_model_dir = conf.get_in_model_dir()
-        ckpt = tf.train.get_checkpoint_state(in_model_dir)
-        should_restore = (ckpt is not None) and (ckpt.model_checkpoint_path is not None)
+        in_model_dir = self.conf.get_in_model_dir()
+        self.ckpt = tf.train.get_checkpoint_state(in_model_dir)
+        self.should_restore = (self.ckpt is not None) and (self.ckpt.model_checkpoint_path is not None)
 
         print('Building network...')
-        net = Network(n_max_instances=n_max_instances, config=conf, is_new_training=not should_restore)
-        with tf.Session(config=tf_conf, graph=net.graph) as self.sess:
-            if conf.is_debug_mode():
+        self.net = Network(n_max_instances=n_max_instances, config=self.conf, is_new_training=not self.should_restore)
+
+
+    def predict_single_pcl(self, pcl):
+
+        with tf.Session(config=self.tf_conf, graph=self.net.graph) as self.sess:
+            self.sess.run(tf.global_variables_initializer())
+            if self.conf.is_debug_mode():
                 self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
 
-            if should_restore:
+            if self.should_restore:
                 print('Restoring ' + ckpt.model_checkpoint_path + ' ...')
-                tf.train.Saver().restore(self.sess, ckpt.model_checkpoint_path)
+                tf.train.Saver().restore(self.sess, self.ckpt.model_checkpoint_path)
 
             print('Loading data...')
 
-    def predict_single_pcl(self, pcl):
-        # Do prediction for current pcl
-        return net.simple_predict_and_return(
-            self.sess,
-            pcl=pcl
-            # pcl already in right format as numpy.ndarray
-            #pcl=np.genfromtxt(args.test_pc_in, delimiter=' ', dtype=float)[:, :3],
-        )
+            # Do prediction for current pcl
+            return self.net.simple_predict_and_return(
+                self.sess,
+                pcl=pcl
+                # pcl already in right format as numpy.ndarray
+                #pcl=np.genfromtxt(args.test_pc_in, delimiter=' ', dtype=float)[:, :3],
+            )
     
 
 
