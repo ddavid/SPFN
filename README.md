@@ -20,6 +20,11 @@ Fitting geometric primitives to 3D point cloud data bridges a gap between low-le
 ### Requirements
 The code has been tested with Tensorflow 1.10 (GPU version) and Python 3.6.6. There are a few dependencies on the following Python libraries : numpy (tested with 1.14.5), scipy (tested with 1.1.0), pandas (tested with 0.23.4), PyYAML (tested with 3.13), and h5py (tested with 2.8.0).
 
+#### Installation
+1. Install [miniconda3](https://docs.conda.io/en/latest/miniconda.html)
+1. Create Conda environment with required dependencies:
+> `conda create -n spfn --file conda-requirements.txt`
+
 ### Usage
 
 #### Compiling PointNet++
