@@ -272,20 +272,28 @@ class Network(object):
 
     # Return prediction as JSON object in bytes
     # json.dumps would be JSON string
-    def single_nn_json(nn_name, pred_result, W_reduced=True):
+    def single_nn_json(self, nn_name, pred_result, W_reduced=True):
+
+        pred_dict = {}
+        param_dict = {}
+
         batch_size = pred_result['W'].shape[0]
         assert batch_size == 1
-        pred_dict = {}
         type_per_point = np.argmax(pred_result['type_per_point'], axis=2)  # BxN
         instance_per_point = pred_result['W']  # BxNxK
         if W_reduced:
             instance_per_point = np.argmax(instance_per_point, axis=2)  # BxN
-        #f = h5py.File(pred_h5_file, 'w')
-        pred_dict['method_name']        = nn_name
-        pred_dict['name_to_id_dict']    = np.void(pickle.dumps(fitter_factory.primitive_name_to_id_dict))
-        pred_dict['normal_per_point']   = pred_result['normal_per_point'][0]
-        pred_dict['type_per_point']     = type_per_point[0]
-        pred_dict['instance_per_point'] = instance_per_point[0]
+
+        pred_dict['method_name'] = nn_name
+        pred_dict['name_to_id_dict'] = fitter_factory.primitive_name_to_id_dict
+        pred_dict['normal_per_point'] = pred_result['normal_per_point'][0].tolist()
+        pred_dict['type_per_point'] = type_per_point[0].tolist()
+        pred_dict['instance_per_point'] = instance_per_point[0].tolist()
+        params = pred_result['parameters']
+        for key in params:
+            param_dict[key] = params[key][0]
+
+        # Do we really need these parameters? --> YES
 
         #f.create_dataset('normal_per_point', data=pred_result['normal_per_point'][0])
         #f.create_dataset('type_per_point', data=type_per_point[0])
@@ -294,6 +302,10 @@ class Network(object):
         #for key in pred_result['parameters']:
         #    g.create_dataset(key, data=pred_result['parameters'][key][0])
         pred_json = json.dumps(pred_dict)
+
+        with open('first-prediction.json', 'w') as file:
+            file.write(pred_json)
+
         serialized_pred_json = pickle.dumps(pred_json)
 
         return serialized_pred_json
