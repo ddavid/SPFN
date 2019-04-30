@@ -68,9 +68,8 @@ class SPFN(object):
             # Do prediction for current pcl
             return self.net.simple_predict_and_return(
                 self.sess,
-                pcl=pcl
-                # pcl already in right format as numpy.ndarray
-                #pcl=np.genfromtxt(args.test_pc_in, delimiter=' ', dtype=float)[:, :3],
+                pcl=pcl,
+                debug=False
             )
     
 
@@ -126,6 +125,7 @@ if __name__ == '__main__':
         print('Loading data...')
         if is_testing:
             if args.test_pc_in is not None:
+                print('Predicting single Point Cloud')
                 # single point cloud testing
                 assert args.test_h5_out is not None
                 net.simple_predict_and_save(

@@ -270,12 +270,14 @@ class Network(object):
             'summary': summary,
         }
 
-    # Return prediction as JSON object in bytes
+    # Return prediction as JSON object string
     # json.dumps would be JSON string
-    def single_nn_json(self, nn_name, pred_result, W_reduced=True):
+    def single_nn_json(self, nn_name, pred_result, debug=False, W_reduced=True):
 
         pred_dict = {}
         param_dict = {}
+        # Insert Param Dict obj in pred_dict
+        pred_dict['parameters'] = param_dict
 
         batch_size = pred_result['W'].shape[0]
         assert batch_size == 1
@@ -291,26 +293,17 @@ class Network(object):
         pred_dict['instance_per_point'] = instance_per_point[0].tolist()
         params = pred_result['parameters']
         for key in params:
-            param_dict[key] = params[key][0]
+            param_dict[key] = params[key][0].tolist()
 
-        # Do we really need these parameters? --> YES
+        pred_json = json.dumps(pred_dict, indent=4)
+        
+        if debug:
+            # Print JSON parsed object
+            print(pred_json)
 
-        #f.create_dataset('normal_per_point', data=pred_result['normal_per_point'][0])
-        #f.create_dataset('type_per_point', data=type_per_point[0])
-        #f.create_dataset('instance_per_point', data=instance_per_point[0])
-        #g = f.create_group('parameters')
-        #for key in pred_result['parameters']:
-        #    g.create_dataset(key, data=pred_result['parameters'][key][0])
-        pred_json = json.dumps(pred_dict)
+        return pred_json
 
-        with open('first-prediction.json', 'w') as file:
-            file.write(pred_json)
-
-        serialized_pred_json = pickle.dumps(pred_json)
-
-        return serialized_pred_json
-
-    def simple_predict_and_return(self, sess, pcl):
+    def simple_predict_and_return(self, sess, pcl, debug):
         feed_dict = {
             self.P: np.expand_dims(pcl, axis=0), # 1xNx3
             self.is_training: False
@@ -319,6 +312,7 @@ class Network(object):
         return self.single_nn_json(
             nn_name=self.config.get_nn_name(),
             pred_result=pred_result,
+            debug=debug,
             W_reduced=False
         )
 
